@@ -8,11 +8,15 @@ from sklearn.preprocessing import MinMaxScaler
 from keras.layers import LSTM, Dense
 from sklearn.model_selection import TimeSeriesSplit
 from keras.models import Sequential
+from keras.models import load_model
 from keras.layers import Dense
 from keras.layers import LSTM
 from keras.utils.vis_utils import plot_model
 
 warnings.filterwarnings("ignore")
+
+# Utility function to predict accuracy
+
 
 df = pd.read_csv("Training Data/MSFT.csv", na_values=[
                  'null'], index_col='Date', parse_dates=True, infer_datetime_format=True)
@@ -50,19 +54,29 @@ lstm = Sequential()
 lstm.add(LSTM(32, input_shape=(
     1, trainX.shape[1]), activation='relu', return_sequences=False))
 lstm.add(Dense(1))
-lstm.compile(loss='mean_squared_error', optimizer='adam')
+lstm.compile(loss='mean_squared_error', optimizer='adam', metrics=['accuracy'])
 plot_model(lstm, show_shapes=True, show_layer_names=True,
            to_file="LSTM_Model.png")
 
-history = lstm.fit(X_train, y_train, epochs=1,
+history = lstm.fit(X_train, y_train, epochs=10,
                    batch_size=8, verbose=1, shuffle=False)
+lstm.save('LSTM_Model.h5')
 
+
+# Accuracy evaluatiom
+# y_test_dummies = pd.get_dummies(y_test).values
+# eval_model = load_model('LSTM_Model.h5')
+# scores = eval_model.evaluate(X_test, y_test_dummies)
+# LSTM_accuracy = scores[1]*100
+# print('Test accuracy: ', LSTM_accuracy, '%')
 # LSTM Prediction
+
+
 y_pred = lstm.predict(X_test)
 
 mape = np.mean(np.abs((y_test-y_pred) / y_test)) * 100
 
-print("MAPE:", mape)
+print("MAPE: " + str(mape) + "%")
 
 # Predicted vs True Adj Close Value – LSTM
 plt.plot(y_test, label='True Value')
