@@ -74,12 +74,6 @@ lstm_model.save("saved_model.h5")
 train_data = new_dataset[:987]
 valid_data = new_dataset[987:]
 valid_data['Predictions'] = predicted_closing_price
-
-train_data['Close'].plot(color='red')
-valid_data[['Close', "Predictions"]].plot(color='blue')
-plt.legend(loc=4)
-plt.xlabel('Close Price')
-plt.ylabel('Date')
+plt.plot(train_data["Close"])
+plt.plot(valid_data[['Close', "Predictions"]])
 plt.show()
-
-
