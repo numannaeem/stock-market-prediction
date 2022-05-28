@@ -54,14 +54,14 @@ lstm = Sequential()
 lstm.add(LSTM(32, input_shape=(
     1, trainX.shape[1]), activation='relu', return_sequences=False))
 lstm.add(Dense(1))
-lstm.compile(loss='mean_squared_error', optimizer='adam', metrics=['accuracy'])
+lstm.compile(loss='mean_squared_error',
+             optimizer='adam', metrics=['accuracy'])
 plot_model(lstm, show_shapes=True, show_layer_names=True,
            to_file="LSTM_Model.png")
 
-history = lstm.fit(X_train, y_train, epochs=10,
+history = lstm.fit(X_train, y_train, epochs=1,
                    batch_size=8, verbose=1, shuffle=False)
 lstm.save('LSTM_Model.h5')
-
 
 # Accuracy evaluatiom
 # y_test_dummies = pd.get_dummies(y_test).values
@@ -69,15 +69,12 @@ lstm.save('LSTM_Model.h5')
 # scores = eval_model.evaluate(X_test, y_test_dummies)
 # LSTM_accuracy = scores[1]*100
 # print('Test accuracy: ', LSTM_accuracy, '%')
+
 # LSTM Prediction
-
-
 y_pred = lstm.predict(X_test)
-
 mape = np.mean(np.abs((y_test-y_pred) / y_test)) * 100
-
-print("MAPE: " + str(mape) + "%")
-
+print("MAPE: " + str(round(mape, 2)) + "%")
+print("Accuracy: " + str(100-round(mape, 2)) + "%")
 # Predicted vs True Adj Close Value – LSTM
 plt.plot(y_test, label='True Value')
 plt.plot(y_pred, label='LSTM Value')
