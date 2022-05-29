@@ -66,7 +66,7 @@ plt.plot(y_test, label='True Value')
 plt.plot(y_pred, label='LSTM Value')
 plt.title("Prediction by LSTM")
 plt.xlabel('Time Scale')
-plt.ylabel('Scaled USD')
+plt.ylabel('Stock Price in USD')
 plt.legend()
 plt.show()
     
