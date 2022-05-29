@@ -19,13 +19,10 @@ plt.show(block=True)
 warnings.filterwarnings("ignore")
 
 # Read the csv file using read_csv
-df = pd.read_csv('Training Data/MSFT.csv')
+df = pd.read_csv('./Training Data/MSFT.csv', index_col='Date',
+                 parse_dates=True, infer_datetime_format=True)
 
 # Changes The Date column as index columns
-df.index = pd.to_datetime(df['Date'])
-
-# drop The original date column
-df = df.drop(['Date'], axis='columns')
 
 # Create predictor variables
 df['Open-Close'] = df.Open - df.Close
@@ -52,9 +49,7 @@ y_test = y[split:]
 # Support vector classifier
 print("\nTraining the SVM model...")
 cls = SVC().fit(X_train, y_train)
-print("\nTesting the SVM model...")
 accuracy = cls.score(X_test, y_test)
-print("\nPlotting test results...")
 
 # Calculate Actual returns
 df['Return'] = df.Close.pct_change()
@@ -65,8 +60,7 @@ df['Predicted_Signal'] = cls.predict(X)
 df['Single_Pred_Returns'] = df.Return * df.Predicted_Signal.shift(1)
 df['Predicted_Returns'] = df['Single_Pred_Returns'].cumsum()
 
-print('\nFinished')
-print("\nTest Accuracy: " + str(round((accuracy*100), 2)) + "%")
+print("\nSVM Test Accuracy: " + str(round((accuracy*100), 2)) + "%")
 figure(num=None, figsize=(40, 20), dpi=160, facecolor='w', edgecolor='k')
 df['Actual_Returns'].plot(color='red')
 df['Predicted_Returns'].plot(color='blue')

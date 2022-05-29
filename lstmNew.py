@@ -1,79 +1,167 @@
-from keras.layers import LSTM, Dropout, Dense
+# Importing the libraries
+# Importing the libraries
+from nsepy import get_history as gh
+import datetime as dt
+from matplotlib import pyplot as plt
+from sklearn import model_selection
+from sklearn.metrics import confusion_matrix
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+import numpy as np
+import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from keras.models import Sequential
-import pandas as pd
-import numpy as np
+from keras.layers import Dense
+from keras.layers import LSTM
+from keras.layers import Dropout
 
-import matplotlib.pyplot as plt
+# Setting start and end dates and fetching the historical data
+start = dt.datetime(2013, 1, 1)
+end = dt.datetime(2018, 12, 31)
+stk_data = gh(symbol='SBIN', start=start, end=end)
 
-df = pd.read_csv("Training Data/MSFT.csv")
+# Visualizing the fetched data
 
-df["Date"] = pd.to_datetime(df["Date"], format="%Y-%m-%d")
-print(df["Date"])
-df.index = df['Date']
-
-plt.figure(figsize=(16, 8))
-#plt.plot(df["Close"], label='Close Price history')
-
-
-data = df.sort_index(ascending=True, axis=0)
-new_dataset = pd.DataFrame(index=range(0, len(df)), columns=['Date', 'Close'])
-
-for i in range(0, len(data)):
-    new_dataset["Date"][i] = data['Date'][i]
-    new_dataset["Close"][i] = data["Close"][i]
-
-new_dataset.index = new_dataset.Date
-new_dataset.drop("Date", axis=1, inplace=True)
-
-scaler = MinMaxScaler(feature_range=(0, 1))
-final_dataset = new_dataset.values
-
-train_data = final_dataset[0:987, :]
-valid_data = final_dataset[987:, :]
-
-scaler = MinMaxScaler(feature_range=(0, 1))
-scaled_data = scaler.fit_transform(final_dataset)
-
-x_train_data, y_train_data = [], []
-
-for i in range(60, len(train_data)):
-    x_train_data.append(scaled_data[i-60:i, 0])
-    y_train_data.append(scaled_data[i, 0])
-
-x_train_data, y_train_data = np.array(x_train_data), np.array(y_train_data)
-
-x_train_data = np.reshape(
-    x_train_data, (x_train_data.shape[0], x_train_data.shape[1], 1))
+# Data Preprocessing
+stk_data['Date'] = stk_data.index
+data2 = pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close'])
+data2['Date'] = stk_data['Date']
+data2['Open'] = stk_data['Open']
+data2['High'] = stk_data['High']
+data2['Low'] = stk_data['Low']
+data2['Close'] = stk_data['Close']
+train_set = data2.iloc[:, 1:2].values
+sc = MinMaxScaler(feature_range=(0, 1))
+training_set_scaled = sc.fit_transform(train_set)
+X_train = []
+y_train = []
+for i in range(60, 1482):
+    X_train.append(training_set_scaled[i-60:i, 0])
+    y_train.append(training_set_scaled[i, 0])
+X_train, y_train = np.array(X_train), np.array(y_train)
+X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
 
 
-lstm_model = Sequential()
-lstm_model.add(LSTM(units=50, return_sequences=True,
-               input_shape=(x_train_data.shape[1], 1)))
-lstm_model.add(LSTM(units=50))
-lstm_model.add(Dense(1))
+# Defining the LSTM Recurrent Model
+regressor = Sequential()
+regressor.add(LSTM(units=50, return_sequences=True,
+              input_shape=(X_train.shape[1], 1)))
+regressor.add(Dropout(0.2))
+regressor.add(LSTM(units=50, return_sequences=True))
+regressor.add(Dropout(0.2))
+regressor.add(LSTM(units=50, return_sequences=True))
+regressor.add(Dropout(0.2))
+regressor.add(LSTM(units=50))
+regressor.add(Dropout(0.2))
+regressor.add(Dense(units=1))
 
-inputs_data = new_dataset[len(new_dataset)-len(valid_data)-60:].values
-inputs_data = inputs_data.reshape(-1, 1)
-inputs_data = scaler.transform(inputs_data)
+# Compiling and fitting the model
+regressor.compile(optimizer='adam', loss='mean_squared_error')
+regressor.fit(X_train, y_train, epochs=15, batch_size=32)
 
-lstm_model.compile(loss='mean_squared_error', optimizer='adam')
-lstm_model.fit(x_train_data, y_train_data, epochs=1, batch_size=1, verbose=2)
 
+# Fetching the test data and preprocessing
+testdataframe = gh(symbol='SBIN', start=dt.datetime(
+    2019, 1, 1), end=dt.datetime(2019, 9, 18))
+testdataframe['Date'] = testdataframe.index
+testdata = pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close'])
+testdata['Date'] = testdataframe['Date']
+testdata['Open'] = testdataframe['Open']
+testdata['High'] = testdataframe['High']
+testdata['Low'] = testdataframe['Low']
+testdata['Close'] = testdataframe['Close']
+real_stock_price = testdata.iloc[:, 1:2].values
+dataset_total = pd.concat((data2['Open'], testdata['Open']), axis=0)
+inputs = dataset_total[len(dataset_total) - len(testdata) - 60:].values
+inputs = inputs.reshape(-1, 1)
+inputs = sc.transform(inputs)
 X_test = []
-for i in range(60, inputs_data.shape[0]):
-    X_test.append(inputs_data[i-60:i, 0])
+for i in range(60, 235):
+    X_test.append(inputs[i-60:i, 0])
 X_test = np.array(X_test)
-
 X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
-predicted_closing_price = lstm_model.predict(X_test)
-predicted_closing_price = scaler.inverse_transform(predicted_closing_price)
 
-lstm_model.save("saved_model.h5")
+# Making predictions on the test data
+predicted_stock_price = regressor.predict(X_test)
+predicted_stock_price = sc.inverse_transform(predicted_stock_price)
 
-train_data = new_dataset[:987]
-valid_data = new_dataset[987:]
-valid_data['Predictions'] = predicted_closing_price
-plt.plot(train_data["Close"])
-plt.plot(valid_data[['Close', "Predictions"]])
+# Visualizing the prediction
+
+
+# Setting start and end dates and fetching the historical data
+stk_data = gh(symbol='SBIN', start=start, end=end)
+
+# Visualizing the fetched data
+
+# Data Preprocessing
+stk_data['Date'] = stk_data.index
+data2 = pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close'])
+data2['Date'] = stk_data['Date']
+data2['Open'] = stk_data['Open']
+data2['High'] = stk_data['High']
+data2['Low'] = stk_data['Low']
+data2['Close'] = stk_data['Close']
+train_set = data2.iloc[:, 1:2].values
+sc = MinMaxScaler(feature_range=(0, 1))
+training_set_scaled = sc.fit_transform(train_set)
+X_train = []
+y_train = []
+for i in range(60, 1482):
+    X_train.append(training_set_scaled[i-60:i, 0])
+    y_train.append(training_set_scaled[i, 0])
+X_train, y_train = np.array(X_train), np.array(y_train)
+X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
+
+
+# Defining the LSTM Recurrent Model
+regressor = Sequential()
+regressor.add(LSTM(units=50, return_sequences=True,
+              input_shape=(X_train.shape[1], 1)))
+regressor.add(Dropout(0.2))
+regressor.add(LSTM(units=50, return_sequences=True))
+regressor.add(Dropout(0.2))
+regressor.add(LSTM(units=50, return_sequences=True))
+regressor.add(Dropout(0.2))
+regressor.add(LSTM(units=50))
+regressor.add(Dropout(0.2))
+regressor.add(Dense(units=1))
+
+# Compiling and fitting the model
+regressor.compile(optimizer='adam', loss='mean_squared_error')
+regressor.fit(X_train, y_train, epochs=15, batch_size=32)
+
+
+# Fetching the test data and preprocessing
+testdataframe = gh(symbol='SBIN', start=dt.datetime(
+    2019, 1, 1), end=dt.datetime(2019, 9, 18))
+testdataframe['Date'] = testdataframe.index
+testdata = pd.DataFrame(columns=['Date', 'Open', 'High', 'Low', 'Close'])
+testdata['Date'] = testdataframe['Date']
+testdata['Open'] = testdataframe['Open']
+testdata['High'] = testdataframe['High']
+testdata['Low'] = testdataframe['Low']
+testdata['Close'] = testdataframe['Close']
+real_stock_price = testdata.iloc[:, 1:2].values
+dataset_total = pd.concat((data2['Open'], testdata['Open']), axis=0)
+inputs = dataset_total[len(dataset_total) - len(testdata) - 60:].values
+inputs = inputs.reshape(-1, 1)
+inputs = sc.transform(inputs)
+X_test = []
+for i in range(60, 235):
+    X_test.append(inputs[i-60:i, 0])
+X_test = np.array(X_test)
+X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
+
+# Making predictions on the test data
+predicted_stock_price = regressor.predict(X_test)
+predicted_stock_price = sc.inverse_transform(predicted_stock_price)
+
+# Visualizing the prediction
+plt.figure(figsize=(20, 10))
+plt.plot(real_stock_price, color='green', label='SBI Stock Price')
+plt.plot(predicted_stock_price, color='red', label='Predicted SBI Stock Price')
+plt.title('SBI Stock Price Prediction')
+plt.xlabel('Trading Day')
+plt.ylabel('SBI Stock Price')
+plt.legend()
 plt.show()

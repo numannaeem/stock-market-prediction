@@ -2,7 +2,11 @@
 import warnings
 import pandas as pd
 import numpy as np
+import datetime
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import figure
+from turtle import color
+from sklearn.svm import SVC
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import MinMaxScaler
 from keras.layers import LSTM, Dense
@@ -13,73 +17,139 @@ from keras.layers import Dense
 from keras.layers import LSTM
 from keras.utils.vis_utils import plot_model
 
+plt.style.use('seaborn-darkgrid')
+plt.show(block=True)
+
 warnings.filterwarnings("ignore")
 
-# Utility function to predict accuracy
+
+def lstm():
+
+    # Reading and preprocessing data
+    df = pd.read_csv("Training Data/MSFT.csv", na_values=[
+        'null'], index_col='Date', parse_dates=True, infer_datetime_format=True)
+
+    print("Dataframe Shape: ", df. shape)
+    print("Null Value Present: ", df.isnull().values.any())
+
+    output_var = pd.DataFrame(df['Adj Close'])
+
+    features = ['Open', 'High', 'Low', 'Volume']
+
+    # Scaling the data to be used in the LSTM model.
+    scaler = MinMaxScaler()
+    feature_transform = scaler.fit_transform(df[features])
+    feature_transform = pd.DataFrame(
+        columns=features, data=feature_transform, index=df.index)
+    feature_transform.head()
+
+    # Splitting the data into 10 parts and using the first 9 parts for training and last part for testing.
+    timesplit = TimeSeriesSplit(n_splits=10)
+    for train_index, test_index in timesplit.split(feature_transform):
+        X_train, X_test = feature_transform[:len(train_index)], feature_transform[len(
+            train_index): (len(train_index)+len(test_index))]
+        y_train, y_test = output_var[:len(train_index)].values.ravel(), output_var[len(
+            train_index): (len(train_index)+len(test_index))].values.ravel()
+
+    # Reshaping the data to be used in the LSTM model.
+    trainX = np.array(X_train)
+    testX = np.array(X_test)
+    X_train = trainX.reshape(X_train.shape[0], 1, X_train.shape[1])
+    X_test = testX.reshape(X_test.shape[0], 1, X_test.shape[1])
+
+    # LSTM model defenition
+    lstm = Sequential()
+    lstm.add(LSTM(32, input_shape=(
+        1, trainX.shape[1]), activation='relu', return_sequences=False))
+    lstm.add(Dense(1))
+    lstm.compile(loss='mean_squared_error',
+                 optimizer='adam', metrics=['accuracy'])
+    plot_model(lstm, show_shapes=True, show_layer_names=True,
+               to_file="LSTM_Model.png")
+
+    history = lstm.fit(X_train, y_train, epochs=1,
+                       batch_size=8, verbose=1, shuffle=False)
+    lstm.save('LSTM_Model.h5')
+
+    # LSTM Prediction
+    y_pred = lstm.predict(X_test)
+    mape = np.mean(np.abs((y_test-y_pred) / y_test)) * 100
+    lstm_res = {
+        "y_pred": y_pred,
+        "y_test": y_test,
+        "mape": mape
+    }
+    return lstm_res
 
 
-df = pd.read_csv("Training Data/MSFT.csv", na_values=[
-                 'null'], index_col='Date', parse_dates=True, infer_datetime_format=True)
-df.head()
+def svm():
+    df = pd.read_csv('./Training Data/MSFT.csv', index_col='Date',
+                     parse_dates=True, infer_datetime_format=True)
 
-# Print the shape of Dataframe  and Check for Null Values
-print("Dataframe Shape: ", df. shape)
-print("Null Value Present: ", df.isnull().values.any())
+    # Create predictor variables
+    df['Open-Close'] = df.Open - df.Close
+    df['High-Low'] = df.High - df.Low
 
-# df['Adj Close'].plot()
+    # Store all predictor variables in a variable X
+    X = df[['Open-Close', 'High-Low']]
+    X.head()
 
-output_var = pd.DataFrame(df['Adj Close'])
-# Selecting the Features
-features = ['Open', 'High', 'Low', 'Volume']
+    # Defining target  variables
+    y = np.where(df['Close'].shift(-1) > df['Close'], 1, 0)
 
-scaler = MinMaxScaler()
-feature_transform = scaler.fit_transform(df[features])
-feature_transform = pd.DataFrame(
-    columns=features, data=feature_transform, index=df.index)
-feature_transform.head()
+    split_percentage = 0.8
+    split = int(split_percentage*len(df))
 
-timesplit = TimeSeriesSplit(n_splits=10)
-for train_index, test_index in timesplit.split(feature_transform):
-    X_train, X_test = feature_transform[:len(train_index)], feature_transform[len(
-        train_index): (len(train_index)+len(test_index))]
-    y_train, y_test = output_var[:len(train_index)].values.ravel(), output_var[len(
-        train_index): (len(train_index)+len(test_index))].values.ravel()
+    # Train data set
+    X_train = X[:split]
+    y_train = y[:split]
 
-trainX = np.array(X_train)
-testX = np.array(X_test)
-X_train = trainX.reshape(X_train.shape[0], 1, X_train.shape[1])
-X_test = testX.reshape(X_test.shape[0], 1, X_test.shape[1])
+    # Test data set
+    X_test = X[split:]
+    y_test = y[split:]
 
-lstm = Sequential()
-lstm.add(LSTM(32, input_shape=(
-    1, trainX.shape[1]), activation='relu', return_sequences=False))
-lstm.add(Dense(1))
-lstm.compile(loss='mean_squared_error',
-             optimizer='adam', metrics=['accuracy'])
-plot_model(lstm, show_shapes=True, show_layer_names=True,
-           to_file="LSTM_Model.png")
+    # Support vector classifier
+    print("\nTraining the SVM model...")
+    cls = SVC().fit(X_train, y_train)
+    accuracy = cls.score(X_test, y_test)
 
-history = lstm.fit(X_train, y_train, epochs=1,
-                   batch_size=8, verbose=1, shuffle=False)
-lstm.save('LSTM_Model.h5')
+    # Calculate Actual returns
+    df['Return'] = df.Close.pct_change()
+    df['Actual_Returns'] = df['Return'].cumsum()
 
-# Accuracy evaluatiom
-# y_test_dummies = pd.get_dummies(y_test).values
-# eval_model = load_model('LSTM_Model.h5')
-# scores = eval_model.evaluate(X_test, y_test_dummies)
-# LSTM_accuracy = scores[1]*100
-# print('Test accuracy: ', LSTM_accuracy, '%')
+    # Calculate Predicted returns
+    df['Predicted_Signal'] = cls.predict(X)
+    df['Single_Pred_Returns'] = df.Return * df.Predicted_Signal.shift(1)
+    df['Predicted_Returns'] = df['Single_Pred_Returns'].cumsum()
 
-# LSTM Prediction
-y_pred = lstm.predict(X_test)
-mape = np.mean(np.abs((y_test-y_pred) / y_test)) * 100
-print("MAPE: " + str(round(mape, 2)) + "%")
-print("Accuracy: " + str(100-round(mape, 2)) + "%")
-# Predicted vs True Adj Close Value – LSTM
-plt.plot(y_test, label='True Value')
-plt.plot(y_pred, label='LSTM Value')
+    svm_res = {
+        "actual_returns": df["Actual_Returns"],
+        "predicted_returns": df["Predicted_Returns"],
+        "accuracy": accuracy,
+    }
+
+    return svm_res
+
+
+lstm_res = lstm()
+print("LSTM Mean Absolute Percentage Error: " +
+      str(round(lstm_res["mape"], 2)) + "%")
+plt.plot(lstm_res["y_test"], label='True Value')
+plt.plot(lstm_res["y_pred"], label='LSTM Value')
 plt.title("Prediction by LSTM")
 plt.xlabel('Time Scale')
 plt.ylabel('Scaled USD')
 plt.legend()
 plt.show()
+
+
+# svm_res = svm()
+# print("\nSVM Percentage Error: " +
+#       str(round((100 - (svm_res["accuracy"])*100), 2)) + "%")
+# figure(num=None, figsize=(40, 20), dpi=160, facecolor='w', edgecolor='k')
+# svm_res["actual_returns"].plot(color='red')
+# svm_res['predicted_returns'].plot(color='blue')
+# plt.legend(loc=4)
+# plt.xlabel('Date')
+# plt.ylabel('Returns')
+# plt.show()
