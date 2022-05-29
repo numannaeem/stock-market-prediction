@@ -12,8 +12,7 @@ import numpy as np
 # To plot
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
-plt.style.use('seaborn-darkgrid')
-plt.show(block=True)
+
 
 # To ignore warnings
 warnings.filterwarnings("ignore")
@@ -60,11 +59,12 @@ df['Predicted_Signal'] = cls.predict(X)
 df['Single_Pred_Returns'] = df.Return * df.Predicted_Signal.shift(1)
 df['Predicted_Returns'] = df['Single_Pred_Returns'].cumsum()
 
-print("\nSVM Test Accuracy: " + str(round((accuracy*100), 2)) + "%")
-figure(num=None, figsize=(40, 20), dpi=160, facecolor='w', edgecolor='k')
-df['Actual_Returns'].plot(color='red')
-df['Predicted_Returns'].plot(color='blue')
-plt.legend(loc=4)
+
+print("\nSVM Model Accuracy: " + str(round((accuracy*100), 2)) + "%")
+plt.plot(df['Actual_Returns'], label='True Returns')
+plt.plot(df['Predicted_Returns'], label='SVM Returns')
+plt.title("Prediction by SVM")
 plt.xlabel('Date')
 plt.ylabel('Returns')
+plt.legend()
 plt.show()
