@@ -1,10 +1,12 @@
-Gonna be very honest, I ripped this off from some online tutorial. But it was decent enough to get me an A-grade on my ML project, so I'm leaving this here in case it helps anyone else in the future.
+Gonna be real with you, I shamelessly ripped this off from some website online. Don't have the slightest clue what an LSTM or SVM even is. But this was decent enough to get me an A on my ML project, so I'm leaving it here in case someone else is desperate enough to use it.
+
+Feel free to go through the code and figure out how it all works, if you care enough.
 
 ---
 Steps to get this working:
 1. `git clone https://github.com/numannaeem/stock-market-prediction.git`
 2. `pip install requirements.txt`
-3. `py lstm.py` or `py svm.py` -> This runs the corresponding algorithm and gives you two fancy looking graphs (real values v/s predicted values).
-
-I have no idea what an "LSTM" or an "SVM" is, but feel free to go through the code and figure out what happens behind the scenes, if you care.
+3. `py lstm.py` or `py svm.py` -> This runs the corresponding algorithm and gives you two fancy looking graphs, something like this:
+   
+   ![image](https://github.com/user-attachments/assets/e5926b28-b253-415c-848e-08e16dea29c4)
 
